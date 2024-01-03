@@ -1,0 +1,11 @@
+# import flags
+.import/
+
+# Translation binaries
+*.translation
+
+# Export presets may include Android keystore credentials
+export_presets.cfg
+
+# Automatically-generated Mono files
+.mono/
