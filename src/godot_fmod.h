@@ -13,7 +13,6 @@
 #include "file_operations.h"
 
 #include "core/map.h"
-#include "core/io/config_file.h"
 
 
 
@@ -64,8 +63,6 @@ public:
 
 private:
 	
-	ConfigFile config;
-
 	FMOD::Studio::System *studio_system;
 	FMOD::System *core_system;
 
