@@ -16,7 +16,7 @@
 
 
 
-class FmodInterface : public Node
+class FmodInterface : public Object
 {
 public:
 	
@@ -24,7 +24,7 @@ public:
 	~FmodInterface();
 	
 private:
-	GDCLASS(FmodInterface, Node);
+	GDCLASS(FmodInterface, Object);
 
 	static FmodInterface *singleton;
 
