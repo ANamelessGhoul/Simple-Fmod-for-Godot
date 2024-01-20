@@ -10,13 +10,14 @@ namespace FmodInterfaceFileOperations {
         Error error;
         FileAccess* file = FileAccess::open(name, FileAccess::READ, &error);
 
+        if (error != Error::OK){
+            return FMOD_RESULT::FMOD_ERR_FILE_BAD;
+        }
+
         *filesize = file->get_len();
         *handle = reinterpret_cast<void*>(file);
 
-        if (error == Error::OK) {
-            return FMOD_RESULT::FMOD_OK;
-        }
-        return FMOD_RESULT::FMOD_ERR_FILE_BAD;
+        return FMOD_RESULT::FMOD_OK;
     }
 
     FMOD_RESULT F_CALLBACK file_close(
