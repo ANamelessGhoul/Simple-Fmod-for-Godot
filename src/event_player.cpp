@@ -125,6 +125,15 @@ void FmodEventPlayer::_notification(int p_what) {
         }
     }
         break;
+    case NOTIFICATION_PREDELETE:{
+        if (has_valid_instance()){
+            if (is_playing()){
+                stop_immediate();
+            }
+            FMOD_ERR_COND_FAIL(event_instance->release());
+        }
+    }
+        break;
     default:
         break;
     }
