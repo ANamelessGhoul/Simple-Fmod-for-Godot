@@ -3,7 +3,7 @@
 #include "godot_fmod.h"
 #include "logging.h"
 
-FmodEventPlayer::FmodEventPlayer() {
+FmodEventPlayer::FmodEventPlayer(): pause_flags(0) {
     event_description = nullptr;
     event_instance = nullptr;
 }
