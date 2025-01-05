@@ -21,6 +21,9 @@ public:
     void stop_immediate();
     void stop_with_fadeout();
 
+    void set_paused(bool p_paused);
+    bool get_paused();
+
 
     FMOD_STUDIO_PLAYBACK_STATE get_playback_state();
     bool is_playing();
@@ -50,6 +53,15 @@ private:
     FMOD::Studio::EventInstance* create_instance();
     void apply_parameters(FMOD::Studio::EventInstance *instance);
 
+    enum PauseFlag {
+        PAUSE_TREE   = 1 << 0,
+        PAUSE_MANUAL = 1 << 1
+    };
+
+    int pause_flags;
+
+    void set_pause_flag(PauseFlag p_flag, bool p_paused);
+    void set_paused_impl(bool p_paused);
 };
 
 

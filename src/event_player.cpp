@@ -49,6 +49,25 @@ void FmodEventPlayer::stop_with_fadeout() {
     stop(FMOD_STUDIO_STOP_ALLOWFADEOUT);
 }
 
+void FmodEventPlayer::set_paused(bool p_paused) {
+    if (!has_valid_instance()){
+        LOG_VERBOSE("Can't pause event because event instance is invalid. Ignoring...")
+        return;
+    }
+    set_pause_flag(PAUSE_MANUAL, p_paused);
+}
+
+bool FmodEventPlayer::get_paused() {
+    if (!has_valid_instance()){
+        LOG_VERBOSE("Can't get pause state of event because event instance is invalid. Returning false.")
+        return false;
+    }
+
+    bool paused = false;
+    FMOD_ERR_COND_PRINT(event_instance->getPaused(&paused));
+	return paused;
+}
+
 FMOD_STUDIO_PLAYBACK_STATE FmodEventPlayer::get_playback_state() {
     if (!has_valid_instance()) {
         return FMOD_STUDIO_PLAYBACK_STOPPED;
@@ -104,6 +123,9 @@ void FmodEventPlayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("stop_immediate"), &FmodEventPlayer::stop_immediate);
     ClassDB::bind_method(D_METHOD("stop_with_fadeout"), &FmodEventPlayer::stop_with_fadeout);
 
+    ClassDB::bind_method(D_METHOD("set_stream_paused"), &FmodEventPlayer::set_paused);
+    ClassDB::bind_method(D_METHOD("get_stream_paused"), &FmodEventPlayer::get_paused);
+
     ClassDB::bind_method(D_METHOD("is_playing"), &FmodEventPlayer::is_playing);
 
     ClassDB::bind_method(D_METHOD("set_parameter", "parameter_name", "value"), &FmodEventPlayer::set_parameter);
@@ -111,20 +133,33 @@ void FmodEventPlayer::_bind_methods() {
 
 
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "event_path", PROPERTY_HINT_ENUM, "load_more_banks,"), "set_event_path", "get_event_path");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "stream_paused"), "set_stream_paused", "get_stream_paused");
 }
 
 void FmodEventPlayer::_notification(int p_what) {
     switch (p_what)
     {
     case NOTIFICATION_ENTER_TREE:{
-    }
-        break;
+    } break;
+
     case NOTIFICATION_PROCESS:{
         if (has_valid_instance() && get_playback_state() == FMOD_STUDIO_PLAYBACK_STOPPED){
             FMOD_ERR_COND_FAIL(event_instance->release());
         }
-    }
-        break;
+    } break;
+
+    case NOTIFICATION_PAUSED:{
+        if (has_valid_instance()){
+            set_pause_flag(PAUSE_TREE, true);
+        }
+    } break;
+
+    case NOTIFICATION_UNPAUSED:{
+        if (has_valid_instance()){
+            set_pause_flag(PAUSE_TREE, false);
+        }
+    } break;
+
     case NOTIFICATION_PREDELETE:{
         if (has_valid_instance()){
             if (is_playing()){
@@ -132,8 +167,8 @@ void FmodEventPlayer::_notification(int p_what) {
             }
             FMOD_ERR_COND_FAIL(event_instance->release());
         }
-    }
-        break;
+    } break;
+
     default:
         break;
     }
@@ -175,4 +210,21 @@ void FmodEventPlayer::apply_parameters(FMOD::Studio::EventInstance *instance) {
         }
 
     }
+}
+
+void FmodEventPlayer::set_pause_flag(PauseFlag p_flag, bool p_paused) {
+    if (p_paused)
+    {
+        pause_flags |= p_flag;
+    }
+    else
+    {
+        pause_flags &= ~p_flag;
+    }
+
+    set_paused_impl(pause_flags > 0);
+}
+
+void FmodEventPlayer::set_paused_impl(bool p_paused) {
+    FMOD_ERR_COND_PRINT(event_instance->setPaused(p_paused));
 }
