@@ -46,12 +46,12 @@ private:
     Map<String, float> parameters;
 
     String event_path;
-    FMOD::Studio::EventDescription *event_description = nullptr;
-	FMOD::Studio::EventInstance *event_instance = nullptr;
+    FMOD_STUDIO_EVENTDESCRIPTION *event_description = nullptr;
+	FMOD_STUDIO_EVENTINSTANCE *event_instance = nullptr;
 
     void load_event_description();
-    FMOD::Studio::EventInstance* create_instance();
-    void apply_parameters(FMOD::Studio::EventInstance *instance);
+    FMOD_STUDIO_EVENTINSTANCE* create_instance();
+    void apply_parameters(FMOD_STUDIO_EVENTINSTANCE *instance);
 
     enum PauseFlag {
         PAUSE_TREE   = 1 << 0,

@@ -181,9 +181,9 @@ void FmodInterface::_bind_methods() {
 
 void FmodInterface::init(int p_num_of_channels, FMOD_STUDIO_INITFLAGS p_studio_flags, FMOD_INITFLAGS p_core_flags) {
 	// initialize FMOD Studio and FMOD Core System with provided flags
-    FMOD_ERR_COND_FAIL(FMOD::Studio::System::create(&studio_system));
-	FMOD_ERR_COND_FAIL(studio_system->getCoreSystem(&core_system));
-    FMOD_ERR_COND_FAIL(studio_system->initialize(p_num_of_channels, p_studio_flags, p_core_flags, nullptr));
+    FMOD_ERR_COND_FAIL(FMOD_Studio_System_Create(&studio_system, FMOD_VERSION));
+	FMOD_ERR_COND_FAIL(FMOD_Studio_System_GetCoreSystem(studio_system, &core_system));
+    FMOD_ERR_COND_FAIL(FMOD_Studio_System_Initialize(studio_system, p_num_of_channels, p_studio_flags, p_core_flags, nullptr));
 
 
     LOG_VERBOSE("Successfully initialized.");
@@ -191,7 +191,8 @@ void FmodInterface::init(int p_num_of_channels, FMOD_STUDIO_INITFLAGS p_studio_f
         LOG_VERBOSE("Live update enabled!");
     }
 
-    FMOD_ERR_COND_FAIL(core_system->setFileSystem(
+    FMOD_ERR_COND_FAIL(FMOD_System_SetFileSystem(
+			core_system,
 			&FmodInterfaceFileOperations::file_open,
 			&FmodInterfaceFileOperations::file_close,
 			&FmodInterfaceFileOperations::file_read,
@@ -204,23 +205,23 @@ void FmodInterface::init(int p_num_of_channels, FMOD_STUDIO_INITFLAGS p_studio_f
 
 void FmodInterface::init_from_settings(FMOD_STUDIO_INITFLAGS p_studio_flags, FMOD_INITFLAGS p_core_flags) {
 	// initialize FMOD Studio and FMOD Core System with provided flags
-    FMOD_ERR_COND_FAIL(FMOD::Studio::System::create(&studio_system));
-	FMOD_ERR_COND_FAIL(studio_system->getCoreSystem(&core_system));
+    FMOD_ERR_COND_FAIL(FMOD_Studio_System_Create(&studio_system, FMOD_VERSION));
+	FMOD_ERR_COND_FAIL(FMOD_Studio_System_GetCoreSystem(studio_system, &core_system));
 
 	int dsp_buffer_length = GLOBAL_GET("fmod/initialization/dsp_buffer_length");
 	int dsp_buffer_count = GLOBAL_GET("fmod/initialization/dsp_buffer_count");
-	core_system->setDSPBufferSize(dsp_buffer_length, dsp_buffer_count);
+	FMOD_System_SetDSPBufferSize(core_system, dsp_buffer_length, dsp_buffer_count);
 
 	int sample_rate = GLOBAL_GET("fmod/initialization/sample_rate");
 	int speaker_mode = GLOBAL_GET("fmod/initialization/speaker_mode");
 	int num_of_raw_speakers = GLOBAL_GET("fmod/initialization/num_of_raw_speakers");
-	core_system->setSoftwareFormat(sample_rate, static_cast<FMOD_SPEAKERMODE>(speaker_mode), num_of_raw_speakers);
+	FMOD_System_SetSoftwareFormat(core_system, sample_rate, static_cast<FMOD_SPEAKERMODE>(speaker_mode), num_of_raw_speakers);
 
 	int num_of_channels = GLOBAL_GET("fmod/initialization/number_of_channels");
 	if (GLOBAL_GET("fmod/initialization/live_update")){
 		p_studio_flags |= FMOD_STUDIO_INIT_LIVEUPDATE;
 	}
-    FMOD_ERR_COND_FAIL(studio_system->initialize(num_of_channels, p_studio_flags, p_core_flags, nullptr));
+    FMOD_ERR_COND_FAIL(FMOD_Studio_System_Initialize(studio_system, num_of_channels, p_studio_flags, p_core_flags, nullptr));
 
 
     LOG_VERBOSE("Successfully initialized.");
@@ -228,7 +229,8 @@ void FmodInterface::init_from_settings(FMOD_STUDIO_INITFLAGS p_studio_flags, FMO
         LOG_VERBOSE("Live update enabled!");
     }
 
-    FMOD_ERR_COND_FAIL(core_system->setFileSystem(
+    FMOD_ERR_COND_FAIL(FMOD_System_SetFileSystem(
+			core_system,
 			&FmodInterfaceFileOperations::file_open,
 			&FmodInterfaceFileOperations::file_close,
 			&FmodInterfaceFileOperations::file_read,
@@ -240,20 +242,20 @@ void FmodInterface::init_from_settings(FMOD_STUDIO_INITFLAGS p_studio_flags, FMO
 }
 
 bool FmodInterface::is_initialized() {
-	return studio_system != nullptr && studio_system->isValid();
+	return studio_system != nullptr && FMOD_Studio_System_IsValid(studio_system);
 }
 
 void FmodInterface::update() {
 	FMOD_INIT_CHECK_ONCE();
 
-    studio_system->update();
+    FMOD_Studio_System_Update(studio_system);
 }
 
 void FmodInterface::shutdown() {
 	FMOD_INIT_CHECK();
 
-    FMOD_ERR_COND_PRINT(studio_system->unloadAll());
-	FMOD_ERR_COND_FAIL(studio_system->release());
+    FMOD_ERR_COND_PRINT(FMOD_Studio_System_UnloadAll(studio_system));
+	FMOD_ERR_COND_FAIL(FMOD_Studio_System_Release(studio_system));
     
     LOG_VERBOSE("Successfully released.");
 }
@@ -269,8 +271,8 @@ void FmodInterface::load_banks_from_settings(){
 void FmodInterface::load_bank(const String& p_filepath, FMOD_STUDIO_LOAD_BANK_FLAGS flags) {
 	FMOD_INIT_CHECK();
 
-    FMOD::Studio::Bank *bank;
-    FMOD_ERR_COND_FAIL_MSG(studio_system->loadBankFile(p_filepath.ascii().get_data(), flags, &bank)\
+    FMOD_STUDIO_BANK *bank;
+    FMOD_ERR_COND_FAIL_MSG(FMOD_Studio_System_LoadBankFile(studio_system, p_filepath.ascii().get_data(), flags, &bank)\
     , vformat("Could not load bank: %s", p_filepath));
 
     filepath_bank_map.insert(p_filepath, bank);
@@ -289,26 +291,26 @@ bool FmodInterface::has_bank(const String& p_filepath) {
 void FmodInterface::set_bus_volume(const String & p_bus_path, float p_volume){
 	FMOD_INIT_CHECK();
 
-    FMOD::Studio::Bus* bus;
-    FMOD_ERR_COND_FAIL(studio_system->getBus(p_bus_path.ascii().get_data(), &bus));
-    FMOD_ERR_COND_FAIL(bus->setVolume(p_volume));
+    FMOD_STUDIO_BUS* bus;
+    FMOD_ERR_COND_FAIL(FMOD_Studio_System_GetBus(studio_system, p_bus_path.ascii().get_data(), &bus));
+    FMOD_ERR_COND_FAIL(FMOD_Studio_Bus_SetVolume(bus, p_volume));
     LOG_VERBOSE(vformat("Set volume of bus \"%s\" to \"%.2f\"", p_bus_path, p_volume));
 }
 
 float FmodInterface::get_bus_volume(const String &p_bus_path) {
 	FMOD_INIT_CHECK_V(-1.f);
 
-	FMOD::Studio::Bus* bus;
-    FMOD_ERR_COND_FAIL_V(studio_system->getBus(p_bus_path.ascii().get_data(), &bus), 0.0f);
+	FMOD_STUDIO_BUS* bus;
+    FMOD_ERR_COND_FAIL_V(FMOD_Studio_System_GetBus(studio_system, p_bus_path.ascii().get_data(), &bus), 0.0f);
     float volume = 0.0f;
-    FMOD_ERR_COND_FAIL_V(bus->getVolume(&volume), 0.0f);
+    FMOD_ERR_COND_FAIL_V(FMOD_Studio_Bus_GetVolume(bus, &volume, nullptr), 0.0f);
     return volume;
 }
 
-FMOD::Studio::EventDescription *FmodInterface::get_event_description(String p_event_path) {
+FMOD_STUDIO_EVENTDESCRIPTION *FmodInterface::get_event_description(String p_event_path) {
 	FMOD_INIT_CHECK_V(nullptr);
-	FMOD::Studio::EventDescription *event_description = nullptr;
-    FMOD_ERR_COND_FAIL_V(studio_system->getEvent(p_event_path.ascii().get_data(), &event_description), nullptr);
+	FMOD_STUDIO_EVENTDESCRIPTION *event_description = nullptr;
+    FMOD_ERR_COND_FAIL_V(FMOD_Studio_System_GetEvent(studio_system, p_event_path.ascii().get_data(), &event_description), nullptr);
     LOG_VERBOSE(vformat("Got event description for path: %s", p_event_path))
     return event_description;
 }
@@ -317,14 +319,14 @@ void FmodInterface::reload_bank_metadata() {
     event_paths.clear();
 
     int capacity;
-    studio_system->getBankCount(&capacity);
-    FMOD::Studio::Bank** banks = new FMOD::Studio::Bank*[capacity];
+    FMOD_Studio_System_GetBankCount(studio_system, &capacity);
+    FMOD_STUDIO_BANK** banks = new FMOD_STUDIO_BANK*[capacity];
     int count;
-    studio_system->getBankList(banks, capacity, &count);
+    FMOD_Studio_System_GetBankList(studio_system, banks, capacity, &count);
 
     for (int i = 0; i < count; i++)
     {
-        FMOD::Studio::Bank* bank = banks[i];
+        FMOD_STUDIO_BANK* bank = banks[i];
         add_event_paths(bank);
         add_bus_paths(bank);
     }
@@ -332,18 +334,18 @@ void FmodInterface::reload_bank_metadata() {
     delete[] banks;
 }
 
-void FmodInterface::add_event_paths(FMOD::Studio::Bank *p_bank) {
+void FmodInterface::add_event_paths(FMOD_STUDIO_BANK *p_bank) {
 	int event_capacity;
-    FMOD_ERR_COND_PRINT(p_bank->getEventCount(&event_capacity));
-    FMOD::Studio::EventDescription** events = new FMOD::Studio::EventDescription*[event_capacity];
+    FMOD_ERR_COND_PRINT(FMOD_Studio_Bank_GetEventCount(p_bank, &event_capacity));
+    FMOD_STUDIO_EVENTDESCRIPTION** events = new FMOD_STUDIO_EVENTDESCRIPTION*[event_capacity];
     int event_count;
-    FMOD_ERR_COND_PRINT(p_bank->getEventList(events, event_capacity, &event_count));
+    FMOD_ERR_COND_PRINT(FMOD_Studio_Bank_GetEventList(p_bank, events, event_capacity, &event_count));
 
     for (int j = 0; j < event_count; j++)
     {
         char path[256];
         int retrieved;
-        events[j]->getPath(path, 256, &retrieved);
+        FMOD_Studio_EventDescription_GetPath(events[j], path, 256, &retrieved);
         event_property_hint = event_property_hint + "," + path;
         event_paths.push_back(path);
     }
@@ -351,18 +353,18 @@ void FmodInterface::add_event_paths(FMOD::Studio::Bank *p_bank) {
     delete[] events;
 }
 
-void FmodInterface::add_bus_paths(FMOD::Studio::Bank *p_bank) {
+void FmodInterface::add_bus_paths(FMOD_STUDIO_BANK *p_bank) {
 	int bus_capacity;
-    FMOD_ERR_COND_PRINT(p_bank->getBusCount(&bus_capacity));
-    FMOD::Studio::Bus** busses = new FMOD::Studio::Bus*[bus_capacity];
+    FMOD_ERR_COND_PRINT(FMOD_Studio_Bank_GetBusCount(p_bank, &bus_capacity));
+    FMOD_STUDIO_BUS** busses = new FMOD_STUDIO_BUS*[bus_capacity];
     int bus_count;
-    FMOD_ERR_COND_PRINT(p_bank->getBusList(busses, bus_capacity, &bus_count));
+    FMOD_ERR_COND_PRINT(FMOD_Studio_Bank_GetBusList(p_bank, busses, bus_capacity, &bus_count));
 
     for (int j = 0; j < bus_count; j++)
     {
         char path[256];
         int retrieved;
-        busses[j]->getPath(path, 256, &retrieved);
+        FMOD_Studio_Bus_GetPath(busses[j], path, 256, &retrieved);
         bus_paths.push_back(path);
     }
 

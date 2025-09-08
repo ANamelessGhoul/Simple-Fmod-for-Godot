@@ -6,9 +6,9 @@
 #include "core/ustring.h"
 #include "core/error_macros.h"
 
-#include "fmod.hpp"
+#include "fmod.h"
 #include "fmod_errors.h"
-#include "fmod_studio.hpp"
+#include "fmod_studio.h"
 
 #include "file_operations.h"
 
@@ -59,14 +59,14 @@ public:
 	// Bus Data
 	Vector<String> get_loaded_bus_paths() { return bus_paths; }
 
-	FMOD::Studio::EventDescription *get_event_description(String p_event_path);
+	FMOD_STUDIO_EVENTDESCRIPTION *get_event_description(String p_event_path);
 
 private:
 	
-	FMOD::Studio::System *studio_system;
-	FMOD::System *core_system;
+	FMOD_STUDIO_SYSTEM *studio_system;
+	FMOD_SYSTEM *core_system;
 
-	Map<String, FMOD::Studio::Bank*> filepath_bank_map;
+	Map<String, FMOD_STUDIO_BANK*> filepath_bank_map;
 
 	Vector<String> event_paths;
 	String event_property_hint;
@@ -75,8 +75,8 @@ private:
 
 
 	void reload_bank_metadata();
-	void add_event_paths(FMOD::Studio::Bank* p_bank);
-	void add_bus_paths(FMOD::Studio::Bank* p_bank);
+	void add_event_paths(FMOD_STUDIO_BANK* p_bank);
+	void add_bus_paths(FMOD_STUDIO_BANK* p_bank);
 
 	void bind_to_game_loop();
 

@@ -9,26 +9,26 @@ FmodEventPlayer::FmodEventPlayer(): pause_flags(0) {
 }
 
 void FmodEventPlayer::play_one_shot() {
-    FMOD::Studio::EventInstance * instance = create_instance();
+    FMOD_STUDIO_EVENTINSTANCE * instance = create_instance();
     
-    FMOD_ERR_COND_FAIL(instance->start());
+    FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Start(instance));
     apply_parameters(instance);
-    FMOD_ERR_COND_FAIL(instance->release());
+    FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Release(instance));
     LOG_VERBOSE(vformat("Playing One-Shot: %s", event_path));
 }
 
 void FmodEventPlayer::play() {
     if (has_valid_instance()){
         if (is_playing()){
-            FMOD_ERR_COND_FAIL(event_instance->stop(FMOD_STUDIO_STOP_IMMEDIATE));
+            FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Stop(event_instance, FMOD_STUDIO_STOP_IMMEDIATE));
         }
-        FMOD_ERR_COND_FAIL(event_instance->release());
+        FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Release(event_instance));
     }
 
-    FMOD::Studio::EventInstance *instance = create_instance();
+    FMOD_STUDIO_EVENTINSTANCE *instance = create_instance();
     apply_parameters(instance);
     event_instance = instance;
-    FMOD_ERR_COND_FAIL(event_instance->start());
+    FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Start(event_instance));
 }
 
 void FmodEventPlayer::stop(FMOD_STUDIO_STOP_MODE p_stop_mode) {
@@ -37,8 +37,8 @@ void FmodEventPlayer::stop(FMOD_STUDIO_STOP_MODE p_stop_mode) {
         return;
     }
 
-    FMOD_ERR_COND_FAIL(event_instance->stop(p_stop_mode));
-    FMOD_ERR_COND_FAIL(event_instance->release());
+    FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Stop(event_instance, p_stop_mode));
+    FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Release(event_instance));
 }
 
 void FmodEventPlayer::stop_immediate() {
@@ -63,9 +63,9 @@ bool FmodEventPlayer::get_paused() {
         return false;
     }
 
-    bool paused = false;
-    FMOD_ERR_COND_PRINT(event_instance->getPaused(&paused));
-	return paused;
+    FMOD_BOOL paused = false;
+    FMOD_ERR_COND_PRINT(FMOD_Studio_EventInstance_GetPaused(event_instance, &paused));
+	return static_cast<bool>(paused);
 }
 
 FMOD_STUDIO_PLAYBACK_STATE FmodEventPlayer::get_playback_state() {
@@ -74,7 +74,7 @@ FMOD_STUDIO_PLAYBACK_STATE FmodEventPlayer::get_playback_state() {
     }
 
     FMOD_STUDIO_PLAYBACK_STATE state = FMOD_STUDIO_PLAYBACK_STOPPED;
-    FMOD_ERR_COND_PRINT(event_instance->getPlaybackState(&state));
+    FMOD_ERR_COND_PRINT(FMOD_Studio_EventInstance_GetPlaybackState(event_instance, &state));
     return state;
 }
 
@@ -83,13 +83,13 @@ bool FmodEventPlayer::is_playing() {
 }
 
 bool FmodEventPlayer::has_valid_instance() {
-    return event_instance != nullptr && event_instance->isValid();
+    return event_instance != nullptr && FMOD_Studio_EventInstance_IsValid(event_instance);
 }
 
 float FmodEventPlayer::set_parameter(String p_parameter_name, float p_value) {
     if (event_description){
         FMOD_STUDIO_PARAMETER_DESCRIPTION parameter_description;
-        FMOD_ERR_COND_PRINT(event_description->getParameterDescriptionByName(p_parameter_name.ascii().get_data(), &parameter_description));
+        FMOD_ERR_COND_PRINT(FMOD_Studio_EventDescription_GetParameterDescriptionByName(event_description, p_parameter_name.ascii().get_data(), &parameter_description));
         p_value = CLAMP(p_value, parameter_description.minimum, parameter_description.maximum);
     }
 
@@ -144,7 +144,7 @@ void FmodEventPlayer::_notification(int p_what) {
 
     case NOTIFICATION_PROCESS:{
         if (has_valid_instance() && get_playback_state() == FMOD_STUDIO_PLAYBACK_STOPPED){
-            FMOD_ERR_COND_FAIL(event_instance->release());
+            FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Release(event_instance));
         }
     } break;
 
@@ -165,7 +165,7 @@ void FmodEventPlayer::_notification(int p_what) {
             if (is_playing()){
                 stop_immediate();
             }
-            FMOD_ERR_COND_FAIL(event_instance->release());
+            FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Release(event_instance));
         }
     } break;
 
@@ -185,27 +185,27 @@ void FmodEventPlayer::load_event_description() {
     event_description = FmodInterface::get_singleton()->get_event_description(event_path);
 }
 
-FMOD::Studio::EventInstance *FmodEventPlayer::create_instance() {
+FMOD_STUDIO_EVENTINSTANCE *FmodEventPlayer::create_instance() {
     if (event_description == nullptr){
         load_event_description();
     }
 
-    FMOD::Studio::EventInstance *instance;
-    FMOD_ERR_COND_PRINT(event_description->createInstance(&instance));
+    FMOD_STUDIO_EVENTINSTANCE *instance;
+    FMOD_ERR_COND_PRINT(FMOD_Studio_EventDescription_CreateInstance(event_description, &instance));
     return instance;
 }
 
-void FmodEventPlayer::apply_parameters(FMOD::Studio::EventInstance *instance) {
+void FmodEventPlayer::apply_parameters(FMOD_STUDIO_EVENTINSTANCE *instance) {
     int count;
-    FMOD_ERR_COND_FAIL(event_description->getParameterDescriptionCount(&count));
+    FMOD_ERR_COND_FAIL(FMOD_Studio_EventDescription_GetParameterDescriptionCount(event_description, &count));
     for(int i = 0; i < count; i++){
         FMOD_STUDIO_PARAMETER_DESCRIPTION description;
-        FMOD_ERR_COND_FAIL(event_description->getParameterDescriptionByIndex(i, &description));
+        FMOD_ERR_COND_FAIL(FMOD_Studio_EventDescription_GetParameterDescriptionByIndex(event_description, i, &description));
 
         String parameter_name = String(description.name);
         if (parameters.has(parameter_name)){
             float parameter_value = parameters[parameter_name];
-            instance->setParameterByID(description.id, parameter_value);
+            FMOD_Studio_EventInstance_SetParameterByID(instance, description.id, parameter_value, false);
             LOG_VERBOSE(vformat("Set parameter \"%s\" in event \"%s\" to \"%f\"", parameter_name, event_path, parameter_value))
         }
 
@@ -226,5 +226,5 @@ void FmodEventPlayer::set_pause_flag(PauseFlag p_flag, bool p_paused) {
 }
 
 void FmodEventPlayer::set_paused_impl(bool p_paused) {
-    FMOD_ERR_COND_PRINT(event_instance->setPaused(p_paused));
+    FMOD_ERR_COND_PRINT(FMOD_Studio_EventInstance_SetPaused(event_instance, p_paused));
 }
