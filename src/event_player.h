@@ -27,35 +27,39 @@ public:
 
     FMOD_STUDIO_PLAYBACK_STATE get_playback_state();
     bool is_playing();
-    bool has_valid_instance();
-
+    bool has_valid_instance() { return is_valid_instance(event_instance); };
+    
     float set_parameter(String p_parameter_name, float p_value);
     void clear_parameter(String p_parameter_name);
-
+    
     void set_event_path(const String& p_event_path);
     String get_event_path() { return event_path; }
-
+    
 protected:
     static void _bind_methods();
 	void _notification(int p_what);
-
+    
 	virtual void _validate_property(PropertyInfo &property) const;
-
-
+    
+    
 private:
     Map<String, float> parameters;
-
+    
     String event_path;
     FMOD_STUDIO_EVENTDESCRIPTION *event_description = nullptr;
 	FMOD_STUDIO_EVENTINSTANCE *event_instance = nullptr;
-
+    
     void load_event_description();
+
     FMOD_STUDIO_EVENTINSTANCE* create_instance();
-    void apply_parameters(FMOD_STUDIO_EVENTINSTANCE *instance);
+    bool is_valid_instance(FMOD_STUDIO_EVENTINSTANCE *p_instance);
+
+    void apply_parameters(FMOD_STUDIO_EVENTINSTANCE *p_instance);
+    void apply_attributes(FMOD_STUDIO_EVENTINSTANCE *p_instance);
 
     enum PauseFlag {
         PAUSE_TREE   = 1 << 0,
-        PAUSE_MANUAL = 1 << 1
+        PAUSE_USER = 1 << 1
     };
 
     int pause_flags;

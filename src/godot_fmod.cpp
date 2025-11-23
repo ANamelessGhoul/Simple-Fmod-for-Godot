@@ -208,6 +208,9 @@ void FmodInterface::init_from_settings(FMOD_STUDIO_INITFLAGS p_studio_flags, FMO
     FMOD_ERR_COND_FAIL(FMOD_Studio_System_Create(&studio_system, FMOD_VERSION));
 	FMOD_ERR_COND_FAIL(FMOD_Studio_System_GetCoreSystem(studio_system, &core_system));
 
+	// NOTE: Godot is right handed
+	p_core_flags |= FMOD_INIT_3D_RIGHTHANDED;
+
 	int dsp_buffer_length = GLOBAL_GET("fmod/initialization/dsp_buffer_length");
 	int dsp_buffer_count = GLOBAL_GET("fmod/initialization/dsp_buffer_count");
 	FMOD_System_SetDSPBufferSize(core_system, dsp_buffer_length, dsp_buffer_count);
@@ -314,6 +317,109 @@ FMOD_STUDIO_EVENTDESCRIPTION *FmodInterface::get_event_description(String p_even
     LOG_VERBOSE(vformat("Got event description for path: %s", p_event_path))
     return event_description;
 }
+
+void FmodInterface::register_listener(FmodEventListener* p_listener) {
+	FMOD_INIT_CHECK();
+	DEV_ASSERT(p_listener != nullptr);
+
+	if (listeners.empty()) {
+		// NOTE: Special case where the is already a default p_listener enabled
+		listeners.push_back(p_listener);
+		p_listener->set_listener_index(0);
+		LOG_VERBOSE("Registered initial listener");
+		return;
+	}
+
+	int listener_count = 0;
+	FMOD_ERR_COND_FAIL(FMOD_Studio_System_GetNumListeners(studio_system, &listener_count));
+	
+	listener_count += 1;
+	FMOD_ERR_COND_FAIL(FMOD_Studio_System_SetNumListeners(studio_system, listener_count));
+
+	listeners.push_back(p_listener);
+	p_listener->set_listener_index(listener_count - 1);
+	
+	LOG_VERBOSE(vformat("Listener registered, new listener count: %d", listener_count));
+
+}
+
+void FmodInterface::unregister_listener(FmodEventListener* p_listener) {
+	FMOD_INIT_CHECK();
+	DEV_ASSERT(p_listener != nullptr);
+
+	listeners.erase(p_listener);
+	if (listeners.empty()) {
+		// NOTE: Special case even if we unregister the last listener, always keep a listener enabled as we can't have 0 listeners in Fmod
+		p_listener->set_listener_index(-1);
+	}
+
+	for (int i = 0; i < listeners.size(); i++) {
+		DEV_ASSERT(listeners[i] != nullptr);
+		listeners[i]->set_listener_index(i);
+	}
+}
+
+void FmodInterface::set_listener_weight(int p_listener, float p_weight) {
+	FMOD_INIT_CHECK();
+	DEV_ASSERT(p_listener >= 0);
+
+	FMOD_ERR_COND_FAIL(FMOD_Studio_System_SetListenerWeight(studio_system, p_listener, p_weight));
+}
+
+float FmodInterface::get_listener_weight(int p_listener) {
+	FMOD_INIT_CHECK_V(1.0f);
+	DEV_ASSERT(p_listener >= 0);
+
+	float weight;
+	
+	FMOD_ERR_COND_FAIL_V(FMOD_Studio_System_GetListenerWeight(studio_system, p_listener, &weight), 1.0f);
+
+	return weight;
+}
+
+void FmodInterface::set_listener_attributes(int p_listener, FMOD_3D_ATTRIBUTES p_attributes) {
+	FMOD_INIT_CHECK();
+	DEV_ASSERT(p_listener >= 0);
+
+	FMOD_ERR_COND_FAIL(FMOD_Studio_System_SetListenerAttributes(studio_system, p_listener, &p_attributes, nullptr));
+}
+
+FMOD_3D_ATTRIBUTES FmodInterface::get_listener_attributes(int p_listener) {
+	FMOD_INIT_CHECK_V(FMOD_3D_ATTRIBUTES{});
+	DEV_ASSERT(p_listener >= 0);
+	FMOD_3D_ATTRIBUTES attributes;
+	FMOD_ERR_COND_FAIL_V(FMOD_Studio_System_GetListenerAttributes(studio_system, p_listener, &attributes, nullptr), FMOD_3D_ATTRIBUTES{});
+
+	return attributes;
+}
+
+
+FMOD_3D_ATTRIBUTES FmodInterface::get_attributes_2d(Node2D* p_node) {
+	DEV_ASSERT(p_node != nullptr);
+
+    FMOD_3D_ATTRIBUTES attributes{};
+    attributes.position = FmodHelpers::to_fmod_vector(p_node->get_global_position());
+    attributes.velocity = FMOD_VECTOR{0, 0, 0};
+    attributes.forward  = FMOD_VECTOR{0, 0, 1.0f};
+    attributes.up       = FMOD_VECTOR{0, -1.0f, 0};
+
+    return attributes;
+}
+
+FMOD_3D_ATTRIBUTES FmodInterface::get_attributes_3d(Spatial* p_node) {
+	DEV_ASSERT(p_node != nullptr);
+	
+    Basis basis = p_node->get_global_transform().basis;
+
+    FMOD_3D_ATTRIBUTES attributes{};
+    attributes.position = FmodHelpers::to_fmod_vector(p_node->get_global_translation());
+    attributes.velocity = FMOD_VECTOR{0, 0, 0};
+    attributes.forward  = FmodHelpers::to_fmod_vector(basis.get_axis(2));
+    attributes.up       = FmodHelpers::to_fmod_vector(basis.get_axis(1));
+
+    return attributes;
+}
+
 
 void FmodInterface::reload_bank_metadata() {
     event_paths.clear();

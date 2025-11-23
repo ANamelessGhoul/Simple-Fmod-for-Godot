@@ -3,10 +3,12 @@
 
 #include "fmod_common.h"
 #include "core/math/vector3.h"
+#include "core/math/vector2.h"
 
-namespace FmodHelpers
-{
+namespace FmodHelpers {
+    
     FMOD_VECTOR to_fmod_vector(Vector3 vec);
+    FMOD_VECTOR to_fmod_vector(Vector2 vec);
 
 } // namespace FmodHelpers
 

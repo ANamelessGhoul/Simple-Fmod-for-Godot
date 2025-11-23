@@ -1,6 +1,16 @@
-[gd_scene load_steps=3 format=2]
+[gd_scene load_steps=6 format=2]
 
 [ext_resource path="res://scripts/main.gd" type="Script" id=1]
+[ext_resource path="res://icon.png" type="Texture" id=2]
+
+[sub_resource type="GDScript" id=3]
+script/source = "extends Node2D
+
+onready var starting_position: Vector2 = position
+
+func _process(_delta: float) -> void:
+	position = starting_position + Vector2(sin(Time.get_ticks_msec() / 1000.0) * 50, 0)
+"
 
 [sub_resource type="GDScript" id=1]
 script/source = "extends FmodEventPlayer
@@ -13,12 +23,44 @@ func _on_PlayButton_pressed():
 	play_one_shot()
 "
 
+[sub_resource type="GDScript" id=2]
+script/source = "extends Node2D
+
+
+func _process(delta: float) -> void:
+	global_position = get_tree().root.get_mouse_position()
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		if event.pressed:
+			$FmodEventPlayer.play()
+"
+
 [node name="Node2D" type="Node2D"]
 script = ExtResource( 1 )
 
-[node name="FmodEventPlayer" type="FmodEventPlayer" parent="."]
+[node name="ListenerParent" type="Node2D" parent="."]
+position = Vector2( 512, 150 )
+script = SubResource( 3 )
+
+[node name="Sprite" type="Sprite" parent="ListenerParent"]
+texture = ExtResource( 2 )
+
+[node name="FmodEventListener" type="FmodEventListener" parent="ListenerParent"]
+
+[node name="Footsteps" type="FmodEventPlayer" parent="ListenerParent"]
 event_path = "event:/Character/Player Footsteps"
 script = SubResource( 1 )
+
+[node name="PlayerParent" type="Node2D" parent="."]
+script = SubResource( 2 )
+
+[node name="FmodEventPlayer" type="FmodEventPlayer" parent="PlayerParent"]
+event_path = "event:/Weapons/Explosion"
+
+[node name="Sprite" type="Sprite" parent="PlayerParent"]
+scale = Vector2( 0.1, 0.1 )
+texture = ExtResource( 2 )
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
@@ -80,5 +122,5 @@ margin_bottom = 211.0
 text = "Play Footstep"
 
 [connection signal="value_changed" from="CanvasLayer/VBoxContainer/VolumeSlider" to="." method="_on_VolumeSlider_value_changed"]
-[connection signal="value_changed" from="CanvasLayer/VBoxContainer/SurfaceSlider" to="FmodEventPlayer" method="_on_SurfaceSlider_value_changed"]
-[connection signal="pressed" from="CanvasLayer/VBoxContainer/PlayButton" to="FmodEventPlayer" method="_on_PlayButton_pressed"]
+[connection signal="value_changed" from="CanvasLayer/VBoxContainer/SurfaceSlider" to="ListenerParent/Footsteps" method="_on_SurfaceSlider_value_changed"]
+[connection signal="pressed" from="CanvasLayer/VBoxContainer/PlayButton" to="ListenerParent/Footsteps" method="_on_PlayButton_pressed"]

@@ -6,6 +6,7 @@
 FmodEventPlayer::FmodEventPlayer(): pause_flags(0) {
     event_description = nullptr;
     event_instance = nullptr;
+	set_process(true);
 }
 
 void FmodEventPlayer::play_one_shot() {
@@ -13,12 +14,18 @@ void FmodEventPlayer::play_one_shot() {
     
     FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Start(instance));
     apply_parameters(instance);
+    apply_attributes(instance);
     FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Release(instance));
     LOG_VERBOSE(vformat("Playing One-Shot: %s", event_path));
 }
 
 void FmodEventPlayer::play() {
-    if (has_valid_instance()){
+    if (event_path.empty()) {
+        LOG_VERBOSE("No event_path set. Ignoring...");
+        return;
+    }
+
+    if (is_valid_instance(event_instance)){
         if (is_playing()){
             FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Stop(event_instance, FMOD_STUDIO_STOP_IMMEDIATE));
         }
@@ -26,13 +33,22 @@ void FmodEventPlayer::play() {
     }
 
     FMOD_STUDIO_EVENTINSTANCE *instance = create_instance();
-    apply_parameters(instance);
     event_instance = instance;
+    
+    apply_parameters(instance);
+    apply_attributes(instance);
+    
     FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Start(event_instance));
+    set_paused_impl(get_paused());
 }
 
 void FmodEventPlayer::stop(FMOD_STUDIO_STOP_MODE p_stop_mode) {
-    if (!has_valid_instance()){
+    if (event_path.empty()) {
+        LOG_VERBOSE("No event_path set. Ignoring...");
+        return;
+    }
+
+    if (!is_valid_instance(event_instance)){
         LOG_VERBOSE("Can't call \"stop()\" because event instance is invalid. Cancelling...")
         return;
     }
@@ -50,26 +66,19 @@ void FmodEventPlayer::stop_with_fadeout() {
 }
 
 void FmodEventPlayer::set_paused(bool p_paused) {
-    if (!has_valid_instance()){
+    if (!has_valid_instance()) {
         LOG_VERBOSE("Can't pause event because event instance is invalid. Ignoring...")
         return;
     }
-    set_pause_flag(PAUSE_MANUAL, p_paused);
+    set_pause_flag(PAUSE_USER, p_paused);
 }
 
 bool FmodEventPlayer::get_paused() {
-    if (!has_valid_instance()){
-        LOG_VERBOSE("Can't get pause state of event because event instance is invalid. Returning false.")
-        return false;
-    }
-
-    FMOD_BOOL paused = false;
-    FMOD_ERR_COND_PRINT(FMOD_Studio_EventInstance_GetPaused(event_instance, &paused));
-	return static_cast<bool>(paused);
+    return pause_flags > 0;
 }
 
 FMOD_STUDIO_PLAYBACK_STATE FmodEventPlayer::get_playback_state() {
-    if (!has_valid_instance()) {
+    if (!is_valid_instance(event_instance)) {
         return FMOD_STUDIO_PLAYBACK_STOPPED;
     }
 
@@ -82,8 +91,8 @@ bool FmodEventPlayer::is_playing() {
     return get_playback_state() != FMOD_STUDIO_PLAYBACK_STOPPED;
 }
 
-bool FmodEventPlayer::has_valid_instance() {
-    return event_instance != nullptr && FMOD_Studio_EventInstance_IsValid(event_instance);
+bool FmodEventPlayer::is_valid_instance(FMOD_STUDIO_EVENTINSTANCE *p_instance) {
+    return p_instance != nullptr && FMOD_Studio_EventInstance_IsValid(p_instance);
 }
 
 float FmodEventPlayer::set_parameter(String p_parameter_name, float p_value) {
@@ -94,7 +103,7 @@ float FmodEventPlayer::set_parameter(String p_parameter_name, float p_value) {
     }
 
     parameters[p_parameter_name] = p_value; 
-    if (has_valid_instance()){
+    if (is_valid_instance(event_instance)){
         apply_parameters(event_instance);
     }
 
@@ -103,7 +112,7 @@ float FmodEventPlayer::set_parameter(String p_parameter_name, float p_value) {
 
 void FmodEventPlayer::clear_parameter(String p_parameter_name) {
     parameters.erase(p_parameter_name);
-    if (has_valid_instance()){
+    if (is_valid_instance(event_instance)){
         apply_parameters(event_instance);
     }
 }
@@ -137,26 +146,28 @@ void FmodEventPlayer::_bind_methods() {
 }
 
 void FmodEventPlayer::_notification(int p_what) {
+    if (p_what == NOTIFICATION_PAUSED || p_what == NOTIFICATION_UNPAUSED) {
+        if (can_process()) {
+            set_pause_flag(PAUSE_TREE, false);
+        } else {
+            set_pause_flag(PAUSE_TREE, true);
+        }
+    }
+
     switch (p_what)
     {
     case NOTIFICATION_ENTER_TREE:{
     } break;
 
     case NOTIFICATION_PROCESS:{
-        if (has_valid_instance() && get_playback_state() == FMOD_STUDIO_PLAYBACK_STOPPED){
-            FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Release(event_instance));
-        }
-    } break;
+        if (is_valid_instance(event_instance)) {
 
-    case NOTIFICATION_PAUSED:{
-        if (has_valid_instance()){
-            set_pause_flag(PAUSE_TREE, true);
-        }
-    } break;
+            apply_attributes(event_instance);
 
-    case NOTIFICATION_UNPAUSED:{
-        if (has_valid_instance()){
-            set_pause_flag(PAUSE_TREE, false);
+            // NOTE: Make sure you do this last, as we won't have an instance after this
+            if (get_playback_state() == FMOD_STUDIO_PLAYBACK_STOPPED){
+                FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Release(event_instance));
+            }
         }
     } break;
 
@@ -195,7 +206,7 @@ FMOD_STUDIO_EVENTINSTANCE *FmodEventPlayer::create_instance() {
     return instance;
 }
 
-void FmodEventPlayer::apply_parameters(FMOD_STUDIO_EVENTINSTANCE *instance) {
+void FmodEventPlayer::apply_parameters(FMOD_STUDIO_EVENTINSTANCE *p_instance) {
     int count;
     FMOD_ERR_COND_FAIL(FMOD_Studio_EventDescription_GetParameterDescriptionCount(event_description, &count));
     for(int i = 0; i < count; i++){
@@ -205,12 +216,47 @@ void FmodEventPlayer::apply_parameters(FMOD_STUDIO_EVENTINSTANCE *instance) {
         String parameter_name = String(description.name);
         if (parameters.has(parameter_name)){
             float parameter_value = parameters[parameter_name];
-            FMOD_Studio_EventInstance_SetParameterByID(instance, description.id, parameter_value, false);
+            FMOD_Studio_EventInstance_SetParameterByID(p_instance, description.id, parameter_value, false);
             LOG_VERBOSE(vformat("Set parameter \"%s\" in event \"%s\" to \"%f\"", parameter_name, event_path, parameter_value))
         }
 
     }
 }
+
+void FmodEventPlayer::apply_attributes(FMOD_STUDIO_EVENTINSTANCE *p_instance) {
+    DEV_ASSERT(is_valid_instance(p_instance));
+
+    FMOD_3D_ATTRIBUTES attributes{};
+
+    bool attributes_found = false;
+
+    Node* parent = get_parent();
+    if (!parent) {
+        WARN_PRINT_ONCE("FmodEventPlayer must have a parent.");
+        return;
+    }
+
+    Node2D* parent_2d = Object::cast_to<Node2D>(parent);
+    if (parent_2d) {
+        attributes = FmodInterface::get_attributes_2d(parent_2d);
+        attributes_found = true;
+    }
+
+    Spatial* parent_spatial = Object::cast_to<Spatial>(parent);
+    if (parent_spatial) {
+        attributes = FmodInterface::get_attributes_3d(parent_spatial);
+        attributes_found = true;
+    }
+    
+    if (!attributes_found) {
+        WARN_PRINT_ONCE("FmodEventPlayer parent must be Node2D or Spatial.");
+        return;
+    }
+
+
+    FMOD_ERR_COND_FAIL(FMOD_Studio_EventInstance_Set3DAttributes(p_instance, &attributes));
+}
+
 
 void FmodEventPlayer::set_pause_flag(PauseFlag p_flag, bool p_paused) {
     if (p_paused)
@@ -226,5 +272,13 @@ void FmodEventPlayer::set_pause_flag(PauseFlag p_flag, bool p_paused) {
 }
 
 void FmodEventPlayer::set_paused_impl(bool p_paused) {
-    FMOD_ERR_COND_PRINT(FMOD_Studio_EventInstance_SetPaused(event_instance, p_paused));
+    if (event_path.empty()) {
+        LOG_VERBOSE("No event_path set, can't set pause. Ignoring...");
+        return;
+    }
+
+    if (is_valid_instance(event_instance))
+    {
+        FMOD_ERR_COND_PRINT(FMOD_Studio_EventInstance_SetPaused(event_instance, p_paused));
+    }
 }
