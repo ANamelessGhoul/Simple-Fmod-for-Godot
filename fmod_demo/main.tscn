@@ -80,7 +80,6 @@ margin_bottom = 81.0
 text = "Volume:"
 
 [node name="VolumeSlider" type="HSlider" parent="CanvasLayer/VBoxContainer"]
-unique_name_in_owner = true
 margin_top = 85.0
 margin_right = 556.0
 margin_bottom = 101.0
